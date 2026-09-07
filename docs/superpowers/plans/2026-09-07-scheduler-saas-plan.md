@@ -27,9 +27,9 @@
 - [X] `network` module: VPC, private subnets, security groups (private-subnets-only — see spec's Networking note; no IGW/NAT needed).
 - [X] `database` module: RDS Postgres instance (free-tier eligible instance class), security group allowing access only from Lambda's SG.
 - [X] Write the initial Postgres schema (`tenants`, `users` [merged with `employees`], `shifts`, `notifications_log` — see spec's Data Model section) via Drizzle ORM (`backend/src/db/schema.ts`); generate the migration with `npx drizzle-kit generate` (produces a plain, readable `.sql` file under `backend/drizzle/`).
-- [ ] Apply Terraform (`terraform apply` in `infra/envs/dev`), pull the master password from Secrets Manager using the `db_secret_arn` output, build a `DATABASE_URL`, and run `npx drizzle-kit migrate` to apply the schema.
+- [X] Apply the schema to RDS. RDS has no path from outside the VPC (private-subnets-only, no NAT/endpoint), so local `psql`/`drizzle-kit migrate` can't reach it — instead, built a one-off/reusable **migration Lambda** (`infra/modules/migrate`, code in `backend/src/lambdas/migrate/handler.ts`), VPC-attached using the existing `lambda` SG + private subnets, that runs Drizzle's migrator against the bundled `.sql` files. Terraform fetches the DB credentials from Secrets Manager at `apply` time and passes them to the Lambda as env vars (the Lambda itself has no internet path to call Secrets Manager at runtime — a sandbox-appropriate tradeoff, revisit for any real production account). Required `ssl: "require"` on the Postgres connection since RDS rejects unencrypted connections by default. Rebuild + redeploy loop for future schema changes: edit `schema.ts` → `npm run db:generate` → `npm run build:migrate` → `terraform apply` → `aws lambda invoke --function-name dev-scheduler-migrate`.
 
-**Done when:** `terraform apply` succeeds, you can connect to the RDS instance with `psql` and see the tables created.
+**Done when:** `terraform apply` succeeds and the migration Lambda invoke returns `{"status":"ok"}` — verified 2026-09-07: `tenants`/`users`/`shifts`/`notifications_log` tables and their enums exist in the live dev RDS instance.
 
 ---
 
