@@ -1,0 +1,24 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+
+# AWS
+.aws/
+
+# Env / secrets
+.env
+.env.*
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+
+# OS
+.DS_Store
