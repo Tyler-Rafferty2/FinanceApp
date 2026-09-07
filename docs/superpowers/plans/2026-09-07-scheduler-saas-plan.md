@@ -21,8 +21,8 @@
 
 **Learn:** Terraform basics, AWS account/IAM setup, networking basics, RDS.
 
-- [ ] Create/confirm an AWS account and an IAM user (not root) with programmatic access for Terraform.
-- [ ] Set up Terraform project structure: `infra/modules/{network,database}`, `infra/envs/dev`.
+- [X] Create/confirm an AWS account and an IAM user (not root) with programmatic access for Terraform.
+- [X] Set up Terraform project structure: `infra/modules/{network,database}`, `infra/envs/dev`.
 - [ ] `network` module: VPC, 2 subnets (public/private is enough for now), security groups.
 - [ ] `database` module: RDS Postgres instance (free-tier eligible instance class), security group allowing access only from Lambda's SG (added in Phase 3).
 - [ ] Write the initial Postgres schema (`tenants`, `users`, `employees`, `shifts`, `notifications_log` — see spec's Data Model section) as a migration you can apply manually (e.g. a `.sql` file run via `psql`).

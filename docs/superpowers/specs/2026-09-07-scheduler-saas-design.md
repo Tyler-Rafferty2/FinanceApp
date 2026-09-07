@@ -99,6 +99,8 @@ Each Lambda is a separate deployable unit with a narrow job — components can b
 - Failed messages retry per SQS redrive policy, then land in a dead-letter queue (`shift-events-dlq`) after N failures.
 - EventBridge has one scheduled rule (e.g. daily at 6am) that triggers `reminders` Lambda, which queries upcoming shifts and pushes reminder messages onto the same `shift-events` queue, reusing the notification pipeline.
 
+**Networking note:** `shifts` and `reminders` are VPC-attached (they need RDS), and both also need to reach SQS's public API. Rather than a NAT Gateway (~$32/mo baseline), this uses a single-AZ SQS **VPC interface endpoint** (~$7-8/mo) so those Lambdas reach SQS over AWS's private network instead of the internet. `notifications` (SQS-triggered, calls SES) does not touch RDS and is therefore **not** VPC-attached — it gets normal outbound internet access for free, no endpoint needed.
+
 ## Real-Time Layer (WebSocket)
 
 - API Gateway WebSocket API terminates persistent client connections; Lambda never holds a connection open, it only reacts to `$connect`, `$disconnect`, and message events.
