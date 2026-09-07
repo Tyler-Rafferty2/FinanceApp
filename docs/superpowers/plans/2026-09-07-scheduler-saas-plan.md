@@ -14,6 +14,7 @@
 - Free tier first; RDS is the one component with a 12-month free-tier clock.
 - IaC via Terraform, module layout as defined in the spec (`infra/modules/*`, `infra/envs/dev`).
 - One environment (`dev`) for the whole plan; `prod` is out of scope.
+- RDS cost control: `terraform apply` at the start of a work session, `terraform destroy` at the end. RDS runs 24/7 once created (unlike Lambda/serverless pieces) and 12-month free tier may not apply to this account — a $10/mo AWS Budget alert (`scheduler-monthly-10`, email) is the backstop if a session ends without destroying. Expect ~7 min for RDS to come up on each `apply`.
 
 ---
 
@@ -23,10 +24,10 @@
 
 - [X] Create/confirm an AWS account and an IAM user (not root) with programmatic access for Terraform.
 - [X] Set up Terraform project structure: `infra/modules/{network,database}`, `infra/envs/dev`.
-- [ ] `network` module: VPC, 2 subnets (public/private is enough for now), security groups.
-- [ ] `database` module: RDS Postgres instance (free-tier eligible instance class), security group allowing access only from Lambda's SG (added in Phase 3).
-- [ ] Write the initial Postgres schema (`tenants`, `users`, `employees`, `shifts`, `notifications_log` — see spec's Data Model section) as a migration you can apply manually (e.g. a `.sql` file run via `psql`).
-- [ ] Apply Terraform, connect to RDS, run the migration.
+- [X] `network` module: VPC, private subnets, security groups (private-subnets-only — see spec's Networking note; no IGW/NAT needed).
+- [X] `database` module: RDS Postgres instance (free-tier eligible instance class), security group allowing access only from Lambda's SG.
+- [X] Write the initial Postgres schema (`tenants`, `users` [merged with `employees`], `shifts`, `notifications_log` — see spec's Data Model section) via Drizzle ORM (`backend/src/db/schema.ts`); generate the migration with `npx drizzle-kit generate` (produces a plain, readable `.sql` file under `backend/drizzle/`).
+- [ ] Apply Terraform (`terraform apply` in `infra/envs/dev`), pull the master password from Secrets Manager using the `db_secret_arn` output, build a `DATABASE_URL`, and run `npx drizzle-kit migrate` to apply the schema.
 
 **Done when:** `terraform apply` succeeds, you can connect to the RDS instance with `psql` and see the tables created.
 

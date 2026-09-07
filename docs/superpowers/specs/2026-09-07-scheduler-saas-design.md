@@ -12,7 +12,7 @@ A multi-tenant staff/shift scheduling web application for companies (think: a co
 - Priority: broad exposure to many AWS services at a basic-to-intermediate level, over deep specialization in a few.
 - Budget: free tier only where possible; a few dollars/month acceptable once free tier windows expire (e.g. RDS after 12 months).
 - Pace: ongoing side project, no fixed deadline — the design is phased so it can be picked up incrementally.
-- Backend: Node.js/TypeScript.
+- Backend: Node.js/TypeScript. Database access/migrations via Drizzle ORM (chosen over Prisma for Lambda cold-start weight; migrations still generate plain readable SQL).
 - IaC: Terraform.
 - Multi-tenant SaaS: one shared deployment serves many companies with isolated data.
 
@@ -57,7 +57,7 @@ Terraform manages all of the above as IaC
 | `auth` (Cognito) | User pools per environment; each user carries `tenant_id` + `role` as custom claims | — |
 | `api` (API Gateway REST) | Routes HTTP requests to Lambdas, validates JWT via Cognito authorizer | Cognito, Lambdas |
 | `companies` Lambda | CRUD for company/tenant records, onboarding | RDS |
-| `employees` Lambda | CRUD for employees within a tenant | RDS |
+| `employees` Lambda | CRUD for the scheduling-relevant fields on `users` within a tenant (job title, etc.) | RDS |
 | `shifts` Lambda | Create/update/query shifts, conflict checks, enqueues SQS event, pushes WebSocket update | RDS, SQS, `connections` table |
 | `notifications` Lambda (SQS consumer) | Sends emails via SES when a shift is created/changed | SQS, SES |
 | `reminders` Lambda (EventBridge trigger) | Daily job: finds upcoming shifts, enqueues reminder notifications | RDS, SQS |
@@ -71,12 +71,11 @@ Each Lambda is a separate deployable unit with a narrow job — components can b
 
 ## Data Model & Multi-Tenancy
 
-**Tables (Postgres):**
+**Tables (Postgres, via Drizzle ORM — schema in `backend/src/db/schema.ts`):**
 - `tenants` — id, name, plan, created_at
-- `users` — id, tenant_id, cognito_sub, email, role (admin/manager/employee)
-- `employees` — id, tenant_id, name, role_title, contact info
-- `shifts` — id, tenant_id, employee_id, start_time, end_time, location, status
-- `notifications_log` — id, tenant_id, shift_id, type, sent_at, status
+- `users` — id, tenant_id, cognito_sub, email, name, role (admin/manager/employee — permission level), job_title (descriptive only, e.g. "Cashier"), created_at. Merged with the earlier separate `employees` concept: every scheduled person also has a login/Cognito account — a sandbox-project simplification.
+- `shifts` — id, tenant_id, employee_id (references `users.id`), start_time, end_time, location, description (what they're doing this shift, e.g. "Cashier — gift shop"; distinct from `users.job_title`), status (enum: scheduled/completed/cancelled), created_at
+- `notifications_log` — id, tenant_id, shift_id, type (enum: shift_created/shift_updated/shift_reminder), status (enum: sent/failed), sent_at
 
 **DynamoDB table:**
 - `connections` — connectionId (PK), tenantId, userId
