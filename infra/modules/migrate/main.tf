@@ -18,7 +18,7 @@ locals {
 }
 
 resource "aws_iam_role" "migrate" {
-  name = "${var.environment}-scheduler-migrate-role"
+  name = "${var.environment}-financeapp-migrate-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -40,7 +40,7 @@ resource "aws_iam_role_policy_attachment" "vpc_access" {
 }
 
 resource "aws_lambda_function" "migrate" {
-  function_name = "${var.environment}-scheduler-migrate"
+  function_name = "${var.environment}-financeapp-migrate"
   role          = aws_iam_role.migrate.arn
   handler       = "handler.handler"
   runtime       = "nodejs20.x"

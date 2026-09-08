@@ -8,7 +8,7 @@ export async function handler() {
   const dbHost = process.env.DB_HOST!; // "host:port"
 
   const [host, port] = dbHost.split(":");
-  const connectionString = `postgres://${username}:${encodeURIComponent(password)}@${host}:${port}/scheduler`;
+  const connectionString = `postgres://${username}:${encodeURIComponent(password)}@${host}:${port}/financeapp`;
 
   console.log("connecting to", dbHost);
   const sql = postgres(connectionString, { max: 1, connect_timeout: 10, ssl: "require" });

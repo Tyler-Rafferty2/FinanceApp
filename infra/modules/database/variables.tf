@@ -17,7 +17,7 @@ variable "instance_class" {
 variable "db_name" {
   description = "Initial database name"
   type        = string
-  default     = "scheduler"
+  default     = "financeapp"
 }
 
 variable "environment" {

@@ -1,4 +1,4 @@
-# Database module — RDS Postgres, single instance, multi-tenant via tenant_id column.
+# Database module — RDS Postgres, single instance, per-user via user_id column.
 #
 # The RDS security group itself is created in the network module (security
 # groups live with the VPC they secure) and passed in via var.rds_security_group_id.
@@ -15,17 +15,17 @@
 # Wire the outputs in outputs.tf as you create each resource.
 
 resource "aws_db_subnet_group" "this" {
-  name       = "${var.environment}-scheduler-db-subnet-group"
+  name       = "${var.environment}-financeapp-db-subnet-group"
   subnet_ids = var.private_subnet_ids
 
   tags = {
-    Name        = "${var.environment}-scheduler-db-subnet-group"
+    Name        = "${var.environment}-financeapp-db-subnet-group"
     Environment = var.environment
   }
 }
 
 resource "aws_db_instance" "this" {
-  identifier     = "${var.environment}-scheduler-db"
+  identifier     = "${var.environment}-financeapp-db"
   engine         = "postgres"
   engine_version = "16.4"
 
@@ -34,7 +34,7 @@ resource "aws_db_instance" "this" {
   storage_type      = "gp2"
 
   db_name  = var.db_name
-  username = "scheduler_admin"
+  username = "financeapp_admin"
 
   manage_master_user_password = true
 
@@ -49,7 +49,7 @@ resource "aws_db_instance" "this" {
   apply_immediately       = true
 
   tags = {
-    Name        = "${var.environment}-scheduler-db"
+    Name        = "${var.environment}-financeapp-db"
     Environment = var.environment
   }
 }

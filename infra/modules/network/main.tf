@@ -6,7 +6,7 @@
 # an outbound AWS API (SQS) will use a VPC interface endpoint instead of NAT
 # — see the spec's "Networking note" under Async/Event-Driven Flow.
 #
-# Resources to add here (Phase 1, per docs/superpowers/plans/2026-09-07-scheduler-saas-plan.md):
+# Resources to add here (Phase 1, per docs/superpowers/specs/2026-09-08-financeapp-design.md):
 #   - aws_vpc.this
 #   - aws_subnet.private (one per AZ)  — RDS goes here
 #   - aws_security_group.rds     — allow 5432 inbound only from lambda_security_group_id
@@ -20,7 +20,7 @@ resource "aws_vpc" "this" {
   enable_dns_hostnames = true
 
   tags = {
-    Name        = "${var.environment}-scheduler-vpc"
+    Name        = "${var.environment}-financeapp-vpc"
     Environment = var.environment
   }
 }
@@ -32,13 +32,13 @@ resource "aws_subnet" "private" {
   availability_zone = each.value
 
   tags = {
-    Name        = "${var.environment}-scheduler-private-${each.value}"
+    Name        = "${var.environment}-financeapp-private-${each.value}"
     Environment = var.environment
   }
 }
 
 resource "aws_security_group" "lambda" {
-  name_prefix = "${var.environment}-scheduler-lambda-"
+  name_prefix = "${var.environment}-financeapp-lambda-"
   vpc_id      = aws_vpc.this.id
   description = "Attached to Lambdas that need to reach RDS"
 
@@ -51,13 +51,13 @@ resource "aws_security_group" "lambda" {
   }
 
   tags = {
-    Name        = "${var.environment}-scheduler-lambda-sg"
+    Name        = "${var.environment}-financeapp-lambda-sg"
     Environment = var.environment
   }
 }
 
 resource "aws_security_group" "rds" {
-  name_prefix = "${var.environment}-scheduler-rds-"
+  name_prefix = "${var.environment}-financeapp-rds-"
   vpc_id      = aws_vpc.this.id
   description = "Allows Postgres access only from the Lambda security group"
 
@@ -69,7 +69,7 @@ resource "aws_security_group" "rds" {
   }
 
   tags = {
-    Name        = "${var.environment}-scheduler-rds-sg"
+    Name        = "${var.environment}-financeapp-rds-sg"
     Environment = var.environment
   }
 }
