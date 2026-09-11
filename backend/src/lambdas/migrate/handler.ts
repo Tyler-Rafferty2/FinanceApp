@@ -16,8 +16,12 @@ export async function handler() {
 
   console.log("running migrations");
   await migrate(db, { migrationsFolder: "./drizzle" });
-  await sql.end();
   console.log("migrations complete");
 
-  return { status: "ok" };
+  console.log("querying")
+  const rows = await sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`;
+  console.log("query complete")
+  sql.end();
+
+  return { status: "ok", rows: rows };
 }

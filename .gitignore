@@ -9,6 +9,7 @@ crash.*.log
 
 # AWS
 .aws/
+*.pem
 
 # Env / secrets
 .env

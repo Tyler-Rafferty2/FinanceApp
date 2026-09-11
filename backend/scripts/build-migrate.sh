@@ -14,7 +14,9 @@ npx esbuild src/lambdas/migrate/handler.ts \
 
 cp -r drizzle dist/migrate/drizzle
 
+rm -f dist/migrate.zip
 cd dist/migrate
+
 zip -r ../migrate.zip . >/dev/null
 cd ../..
 
