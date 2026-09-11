@@ -5,13 +5,15 @@
   "type": "module",
   "scripts": {
     "db:generate": "drizzle-kit generate",
-    "build:migrate": "bash scripts/build-migrate.sh"
+    "build:migrate": "bash scripts/build-migrate.sh",
+    "build:post-confirmation": "bash scripts/build-post-confirmation.sh"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.163",
     "@types/node": "^26.5.0",
     "drizzle-kit": "^0.31.10",
     "esbuild": "^0.28.2",

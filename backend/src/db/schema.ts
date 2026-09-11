@@ -5,7 +5,7 @@ import { pgTable, pgEnum, uuid, text, timestamp, numeric } from "drizzle-orm/pg-
 export const users = pgTable("users", {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
-    email: text("email").notNull(),
+    email: text("email").notNull().unique(),
     cognitoSub: text("cognito_sub").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

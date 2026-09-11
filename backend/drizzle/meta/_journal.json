@@ -8,6 +8,13 @@
       "when": 1788913554617,
       "tag": "0000_brainy_strong_guy",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789168106165,
+      "tag": "0001_wealthy_killraven",
+      "breakpoints": true
     }
   ]
 }

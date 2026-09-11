@@ -27,8 +27,12 @@ module "migrate" {
   environment              = var.environment
 }
 
-# Phase 2+ modules get added here as you build them, e.g.:
-# module "auth" {
-#   source = "../../modules/auth"
-#   ...
-# }
+module "auth" {
+  source = "../../modules/auth"
+
+  environment              = var.environment
+  private_subnet_ids       = module.network.private_subnet_ids
+  lambda_security_group_id = module.network.lambda_security_group_id
+  db_secret_arn            = module.database.db_secret_arn
+  db_host                  = module.database.db_endpoint
+}

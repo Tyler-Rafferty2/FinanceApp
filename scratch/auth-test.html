@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>FinanceApp Auth Test (throwaway)</title>
+</head>
+<body style="font-family: monospace; max-width: 600px; margin: 40px auto;">
+  <h2>Auth test harness — not the real app</h2>
+
+  <section>
+    <h3>1. Sign up</h3>
+    <input id="su-email" placeholder="email" style="width: 100%"><br><br>
+    <input id="su-password" placeholder="password" type="password" style="width: 100%"><br><br>
+    <input id="su-name" placeholder="name" style="width: 100%"><br><br>
+    <button onclick="signUp()">Sign Up</button>
+  </section>
+
+  <hr>
+
+  <section>
+    <h3>2. Confirm</h3>
+    <input id="c-email" placeholder="email" style="width: 100%"><br><br>
+    <input id="c-code" placeholder="code from email" style="width: 100%"><br><br>
+    <button onclick="confirmSignUp()">Confirm</button>
+  </section>
+
+  <hr>
+
+  <section>
+    <h3>3. Log in</h3>
+    <input id="li-email" placeholder="email" style="width: 100%"><br><br>
+    <input id="li-password" placeholder="password" type="password" style="width: 100%"><br><br>
+    <button onclick="login()">Log In</button>
+  </section>
+
+  <hr>
+
+  <pre id="out" style="white-space: pre-wrap; background: #eee; padding: 10px;"></pre>
+
+  <script>
+    const REGION = "us-east-1";
+    const CLIENT_ID = "7jvsv98dk4pd16pdmhpvglnemm";
+    const ENDPOINT = `https://cognito-idp.${REGION}.amazonaws.com/`;
+
+    function log(label, data) {
+      document.getElementById("out").textContent =
+        `${label}:\n` + JSON.stringify(data, null, 2);
+    }
+
+    async function callCognito(target, body) {
+      const res = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Target": `AWSCognitoIdentityProviderService.${target}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw data;
+      return data;
+    }
+
+    async function signUp() {
+      try {
+        const result = await callCognito("SignUp", {
+          ClientId: CLIENT_ID,
+          Username: document.getElementById("su-email").value,
+          Password: document.getElementById("su-password").value,
+          UserAttributes: [
+            { Name: "name", Value: document.getElementById("su-name").value },
+          ],
+        });
+        log("sign up ok", result);
+      } catch (err) {
+        log("sign up error", err);
+      }
+    }
+
+    async function confirmSignUp() {
+      try {
+        const result = await callCognito("ConfirmSignUp", {
+          ClientId: CLIENT_ID,
+          Username: document.getElementById("c-email").value,
+          ConfirmationCode: document.getElementById("c-code").value,
+        });
+        log("confirm ok", result);
+      } catch (err) {
+        log("confirm error", err);
+      }
+    }
+
+    async function login() {
+      try {
+        const result = await callCognito("InitiateAuth", {
+          ClientId: CLIENT_ID,
+          AuthFlow: "USER_PASSWORD_AUTH",
+          AuthParameters: {
+            USERNAME: document.getElementById("li-email").value,
+            PASSWORD: document.getElementById("li-password").value,
+          },
+        });
+        log("login ok — JWT below", result.AuthenticationResult);
+      } catch (err) {
+        log("login error", err);
+      }
+    }
+  </script>
+</body>
+</html>
