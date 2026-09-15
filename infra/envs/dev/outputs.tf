@@ -17,3 +17,8 @@ output "user_pool_client_id" {
   description = "Cognito app client ID"
   value       = module.auth.user_pool_client_id
 }
+
+output "api_invoke_url" {
+  description = "Base invoke URL for the API Gateway dev stage"
+  value       = module.api.invoke_url
+}

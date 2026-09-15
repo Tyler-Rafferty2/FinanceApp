@@ -32,7 +32,7 @@ resource "aws_lambda_function" "post_confirmation" {
   function_name = "${var.environment}-financeapp-post-confirmation"
   role          = aws_iam_role.post_confirmation.arn
   handler       = "handler.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = 10
 
   filename         = "${path.module}/../../../backend/dist/post-confirmation.zip"
@@ -61,37 +61,41 @@ resource "aws_lambda_permission" "allow_cognito" {
 }
 
 resource "aws_cognito_user_pool" "pool" {
-    name = "${var.environment}-financeapp-user-pool"
+  name = "${var.environment}-financeapp-user-pool"
 
-    username_attributes = ["email"]
+  username_attributes = ["email"]
 
 
-    auto_verified_attributes = ["email"]
+  auto_verified_attributes = ["email"]
 
-    password_policy {
-        minimum_length = 8
-        require_uppercase = true
-        require_lowercase = true
-        require_numbers = true
-        require_symbols = true
-    }
+  password_policy {
+    minimum_length    = 8
+    require_uppercase = true
+    require_lowercase = true
+    require_numbers   = true
+    require_symbols   = true
+  }
 
-    verification_message_template {
-      default_email_option = "CONFIRM_WITH_CODE"
-      email_subject        = "FinanceApp Email Verification"
-      email_message        = "Your verification code is {####}"
-    }
+  username_configuration {
+    case_sensitive = false
+  }
 
-     schema {
-        name                = "name"
-        attribute_data_type = "String"
-        required             = true
-        mutable              = true
-    }
+  verification_message_template {
+    default_email_option = "CONFIRM_WITH_CODE"
+    email_subject        = "FinanceApp Email Verification"
+    email_message        = "Your verification code is {####}"
+  }
 
-    lambda_config {
-      post_confirmation = aws_lambda_function.post_confirmation.arn
-    }
+  schema {
+    name                = "name"
+    attribute_data_type = "String"
+    required            = true
+    mutable             = true
+  }
+
+  lambda_config {
+    post_confirmation = aws_lambda_function.post_confirmation.arn
+  }
 }
 
 resource "aws_cognito_user_pool_client" "client" {

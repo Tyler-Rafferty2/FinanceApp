@@ -6,11 +6,19 @@
   "scripts": {
     "db:generate": "drizzle-kit generate",
     "build:migrate": "bash scripts/build-migrate.sh",
-    "build:post-confirmation": "bash scripts/build-post-confirmation.sh"
+    "build:post-confirmation": "bash scripts/build-post-confirmation.sh",
+    "build:accounts": "bash scripts/build-accounts.sh",
+    "build:categories": "bash scripts/build-categories.sh",
+    "build:transactions": "bash scripts/build-transactions.sh",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.9.1",
     "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.9"
+    "hono": "^4.13.7",
+    "postgres": "^3.4.9",
+    "zod": "^4.6.4"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.163",
@@ -18,6 +26,7 @@
     "drizzle-kit": "^0.31.10",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.13",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   }
 }

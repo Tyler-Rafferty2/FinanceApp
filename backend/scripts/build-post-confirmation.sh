@@ -9,7 +9,7 @@ mkdir -p dist/post-confirmation
 npx esbuild src/lambdas/post-confirmation/handler.ts \
   --bundle \
   --platform=node \
-  --target=node20 \
+  --target=node22 \
   --outfile=dist/post-confirmation/handler.js
 
 rm -f dist/post-confirmation.zip

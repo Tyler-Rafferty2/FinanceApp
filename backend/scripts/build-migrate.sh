@@ -9,7 +9,7 @@ mkdir -p dist/migrate
 npx esbuild src/lambdas/migrate/handler.ts \
   --bundle \
   --platform=node \
-  --target=node20 \
+  --target=node22 \
   --outfile=dist/migrate/handler.js
 
 cp -r drizzle dist/migrate/drizzle

@@ -43,7 +43,7 @@ resource "aws_lambda_function" "migrate" {
   function_name = "${var.environment}-financeapp-migrate"
   role          = aws_iam_role.migrate.arn
   handler       = "handler.handler"
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   timeout       = 60
 
   filename         = "${path.module}/../../../backend/dist/migrate.zip"

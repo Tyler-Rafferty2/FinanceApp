@@ -36,3 +36,14 @@ module "auth" {
   db_secret_arn            = module.database.db_secret_arn
   db_host                  = module.database.db_endpoint
 }
+
+module "api" {
+  source = "../../modules/api"
+
+  environment              = var.environment
+  cognito_user_pool_arn    = module.auth.user_pool_arn
+  private_subnet_ids       = module.network.private_subnet_ids
+  lambda_security_group_id = module.network.lambda_security_group_id
+  db_secret_arn            = module.database.db_secret_arn
+  db_host                  = module.database.db_endpoint
+}
