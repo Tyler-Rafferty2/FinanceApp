@@ -7,7 +7,7 @@ EMAIL="${1:?usage: get-token.sh <email> <password>}"
 PASSWORD="${2:?usage: get-token.sh <email> <password>}"
 
 REGION="us-east-1"
-CLIENT_ID="7jvsv98dk4pd16pdmhpvglnemm"
+CLIENT_ID="7ca0ana35j1712lp4ssj7ape53"
 
 curl -s "https://cognito-idp.${REGION}.amazonaws.com/" \
   -H "Content-Type: application/x-amz-json-1.1" \

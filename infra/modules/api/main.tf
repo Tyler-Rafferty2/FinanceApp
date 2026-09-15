@@ -41,14 +41,27 @@ resource "aws_api_gateway_deployment" "api_gateway_deployment" {
       aws_api_gateway_resource.accounts_proxy.id,
       aws_api_gateway_method.accounts_method.id,
       aws_api_gateway_integration.accounts_integration.id,
+      aws_api_gateway_method.accounts_options.id,
+      aws_api_gateway_integration.accounts_options_integration.id,
+      aws_api_gateway_integration_response.accounts_options_integration_response.id,
       aws_api_gateway_resource.categories.id,
       aws_api_gateway_resource.categories_proxy.id,
       aws_api_gateway_method.categories_method.id,
       aws_api_gateway_integration.categories_integration.id,
+      aws_api_gateway_method.categories_options.id,
+      aws_api_gateway_integration.categories_options_integration.id,
+      aws_api_gateway_integration_response.categories_options_integration_response.id,
       aws_api_gateway_resource.transactions.id,
       aws_api_gateway_resource.transactions_proxy.id,
       aws_api_gateway_method.transactions_method.id,
       aws_api_gateway_integration.transactions_integration.id,
+      aws_api_gateway_method.transactions_options.id,
+      aws_api_gateway_integration.transactions_options_integration.id,
+      aws_api_gateway_integration_response.transactions_options_integration_response.id,
+      aws_api_gateway_gateway_response.unauthorized.id,
+      aws_api_gateway_gateway_response.access_denied.id,
+      aws_api_gateway_gateway_response.default_4xx.id,
+      aws_api_gateway_gateway_response.default_5xx.id,
     ]))
   }
 
@@ -60,7 +73,7 @@ resource "aws_api_gateway_deployment" "api_gateway_deployment" {
 resource "aws_api_gateway_stage" "api_gateway_stage" {
   deployment_id = aws_api_gateway_deployment.api_gateway_deployment.id
   rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
-  stage_name    = "${var.environment}"
+  stage_name    = var.environment
 }
 
 #accounts
@@ -111,9 +124,10 @@ resource "aws_lambda_function" "accounts" {
 
   environment {
     variables = {
-      DB_USERNAME = local.db_creds.username
-      DB_PASSWORD = local.db_creds.password
-      DB_HOST     = var.db_host
+      DB_USERNAME    = local.db_creds.username
+      DB_PASSWORD    = local.db_creds.password
+      DB_HOST        = var.db_host
+      ALLOWED_ORIGIN = var.frontend_origin
     }
   }
 }
@@ -124,6 +138,55 @@ resource "aws_lambda_permission" "allow_apigw_accounts" {
   function_name = aws_lambda_function.accounts.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.api_gateway.execution_arn}/*/*"
+}
+
+# CORS preflight — OPTIONS has no Authorization header by design, so it can't
+# go through the Cognito authorizer like the ANY method above does. This is a
+# separate, unauthenticated MOCK method that just echoes back the allowed
+# headers/methods/origin so the browser's preflight check passes; the real
+# request still goes through the authorizer as normal.
+resource "aws_api_gateway_method" "accounts_options" {
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  resource_id   = aws_api_gateway_resource.accounts_proxy.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method_response" "accounts_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.accounts_proxy.id
+  http_method = aws_api_gateway_method.accounts_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration" "accounts_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.accounts_proxy.id
+  http_method = aws_api_gateway_method.accounts_options.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "accounts_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.accounts_proxy.id
+  http_method = aws_api_gateway_method.accounts_options.http_method
+  status_code = aws_api_gateway_method_response.accounts_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.frontend_origin}'"
+  }
 }
 
 #categories
@@ -174,9 +237,10 @@ resource "aws_lambda_function" "categories" {
 
   environment {
     variables = {
-      DB_USERNAME = local.db_creds.username
-      DB_PASSWORD = local.db_creds.password
-      DB_HOST     = var.db_host
+      DB_USERNAME    = local.db_creds.username
+      DB_PASSWORD    = local.db_creds.password
+      DB_HOST        = var.db_host
+      ALLOWED_ORIGIN = var.frontend_origin
     }
   }
 }
@@ -187,6 +251,50 @@ resource "aws_lambda_permission" "allow_apigw_categories" {
   function_name = aws_lambda_function.categories.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.api_gateway.execution_arn}/*/*"
+}
+
+resource "aws_api_gateway_method" "categories_options" {
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  resource_id   = aws_api_gateway_resource.categories_proxy.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method_response" "categories_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.categories_proxy.id
+  http_method = aws_api_gateway_method.categories_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration" "categories_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.categories_proxy.id
+  http_method = aws_api_gateway_method.categories_options.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "categories_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.categories_proxy.id
+  http_method = aws_api_gateway_method.categories_options.http_method
+  status_code = aws_api_gateway_method_response.categories_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.frontend_origin}'"
+  }
 }
 
 #transactions
@@ -237,9 +345,10 @@ resource "aws_lambda_function" "transactions" {
 
   environment {
     variables = {
-      DB_USERNAME = local.db_creds.username
-      DB_PASSWORD = local.db_creds.password
-      DB_HOST     = var.db_host
+      DB_USERNAME    = local.db_creds.username
+      DB_PASSWORD    = local.db_creds.password
+      DB_HOST        = var.db_host
+      ALLOWED_ORIGIN = var.frontend_origin
     }
   }
 }
@@ -252,6 +361,50 @@ resource "aws_lambda_permission" "allow_apigw_transactions" {
   source_arn    = "${aws_api_gateway_rest_api.api_gateway.execution_arn}/*/*"
 }
 
+resource "aws_api_gateway_method" "transactions_options" {
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  resource_id   = aws_api_gateway_resource.transactions_proxy.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method_response" "transactions_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.transactions_proxy.id
+  http_method = aws_api_gateway_method.transactions_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration" "transactions_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.transactions_proxy.id
+  http_method = aws_api_gateway_method.transactions_options.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "transactions_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.transactions_proxy.id
+  http_method = aws_api_gateway_method.transactions_options.http_method
+  status_code = aws_api_gateway_method_response.transactions_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.frontend_origin}'"
+  }
+}
+
 #Authorizer
 
 resource "aws_api_gateway_authorizer" "cognito" {
@@ -260,4 +413,51 @@ resource "aws_api_gateway_authorizer" "cognito" {
   type            = "COGNITO_USER_POOLS"
   provider_arns   = [var.cognito_user_pool_arn]
   identity_source = "method.request.header.Authorization"
+}
+
+# A request the Cognito authorizer rejects (missing/invalid/expired token)
+# never reaches the Lambda, so Hono's cors() middleware never runs — API
+# Gateway serves its own built-in "Gateway Response" instead. Without these,
+# every auth failure comes back with no CORS headers at all, which the
+# browser reports as a CORS error instead of surfacing the real 401/403.
+resource "aws_api_gateway_gateway_response" "unauthorized" {
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  response_type = "UNAUTHORIZED"
+  status_code   = "401"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${var.frontend_origin}'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+  }
+}
+
+resource "aws_api_gateway_gateway_response" "access_denied" {
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  response_type = "ACCESS_DENIED"
+  status_code   = "403"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${var.frontend_origin}'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+  }
+}
+
+resource "aws_api_gateway_gateway_response" "default_4xx" {
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  response_type = "DEFAULT_4XX"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${var.frontend_origin}'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+  }
+}
+
+resource "aws_api_gateway_gateway_response" "default_5xx" {
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  response_type = "DEFAULT_5XX"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${var.frontend_origin}'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+  }
 }

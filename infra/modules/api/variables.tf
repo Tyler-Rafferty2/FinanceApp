@@ -27,3 +27,9 @@ variable "db_host" {
   description = "RDS endpoint (host:port)"
   type        = string
 }
+
+variable "frontend_origin" {
+  description = "Origin allowed to call the API via CORS (e.g. the CloudFront URL). \"*\" is fine here since auth uses a Bearer token, not cookies."
+  type        = string
+  default     = "*"
+}

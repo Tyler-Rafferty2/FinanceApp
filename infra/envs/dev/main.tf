@@ -46,4 +46,5 @@ module "api" {
   lambda_security_group_id = module.network.lambda_security_group_id
   db_secret_arn            = module.database.db_secret_arn
   db_host                  = module.database.db_endpoint
+  frontend_origin          = var.frontend_origin
 }

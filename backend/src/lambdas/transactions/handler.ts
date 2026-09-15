@@ -2,6 +2,7 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { Hono, Context } from 'hono'
 import type { LambdaEvent, LambdaContext } from 'hono/aws-lambda'
 import { handle } from 'hono/aws-lambda'
+import { cors } from 'hono/cors'
 
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -18,6 +19,11 @@ type Bindings = {
 }
 
 const app = new Hono<{ Bindings: Bindings }>().basePath('/transactions')
+
+// API Gateway's OPTIONS MOCK integration handles the CORS preflight; this
+// middleware puts the matching headers on the real GET/POST/PUT/DELETE
+// responses so the browser accepts them too.
+app.use('*', cors({ origin: process.env.ALLOWED_ORIGIN ?? '*' }))
 
 // Connection is reused across warm Lambda invocations (created once at module
 // scope below, not per-request) since RDS Proxy — the usual fix for Lambda's

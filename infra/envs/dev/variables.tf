@@ -27,3 +27,9 @@ variable "azs" {
   type        = list(string)
   default     = ["us-east-1a", "us-east-1b"]
 }
+
+variable "frontend_origin" {
+  description = "Origin allowed to call the API via CORS. Defaults to \"*\" until the CloudFront URL exists (Phase 4 Task 4), then tighten it to that URL."
+  type        = string
+  default     = "*"
+}
