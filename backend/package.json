@@ -10,13 +10,22 @@
     "build:accounts": "bash scripts/build-accounts.sh",
     "build:categories": "bash scripts/build-categories.sh",
     "build:transactions": "bash scripts/build-transactions.sh",
+    "build:digest": "bash scripts/build-digest.sh",
+    "build:notifications": "bash scripts/build-notifications.sh",
+    "build:plaid-link": "bash scripts/build-plaid-link.sh",
+    "build:plaid-webhook": "bash scripts/build-plaid-webhook.sh",
+    "build:plaid-persist": "bash scripts/build-plaid-persist.sh",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.968.0",
+    "@aws-sdk/client-ses": "^3.968.0",
+    "@aws-sdk/client-sqs": "^3.968.0",
     "@hono/zod-validator": "^0.9.1",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.7",
+    "plaid": "^42.0.0",
     "postgres": "^3.4.9",
     "zod": "^4.6.4"
   },

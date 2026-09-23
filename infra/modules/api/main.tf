@@ -2,6 +2,16 @@ resource "aws_api_gateway_rest_api" "api_gateway" {
   name = "${var.environment}-financeapp-api-gateway"
 }
 
+data "aws_region" "current" {}
+
+# Built from the REST API id directly (not aws_api_gateway_stage.invoke_url)
+# to avoid a dependency cycle: plaid_link needs this to tell Plaid where to
+# send webhooks, but the stage depends on the deployment, which depends on
+# the plaid_link integration.
+locals {
+  api_base_url = "https://${aws_api_gateway_rest_api.api_gateway.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
+}
+
 data "aws_secretsmanager_secret_version" "db" {
   secret_id = var.db_secret_arn
 }
@@ -30,6 +40,22 @@ resource "aws_iam_role_policy_attachment" "api_basic_logs" {
 resource "aws_iam_role_policy_attachment" "api_vpc_access" {
   role       = aws_iam_role.api.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+# Shared by accounts/categories/transactions, but only transactions actually
+# sends to this queue — scoped to the one queue ARN rather than "sqs:*".
+resource "aws_iam_role_policy" "api_transaction_events_send" {
+  name = "${var.environment}-financeapp-api-transaction-events-send"
+  role = aws_iam_role.api.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "sqs:SendMessage"
+      Resource = var.transaction_events_queue_arn
+    }]
+  })
 }
 
 resource "aws_api_gateway_deployment" "api_gateway_deployment" {
@@ -62,6 +88,16 @@ resource "aws_api_gateway_deployment" "api_gateway_deployment" {
       aws_api_gateway_gateway_response.access_denied.id,
       aws_api_gateway_gateway_response.default_4xx.id,
       aws_api_gateway_gateway_response.default_5xx.id,
+      aws_api_gateway_resource.plaid.id,
+      aws_api_gateway_resource.plaid_proxy.id,
+      aws_api_gateway_method.plaid_method.id,
+      aws_api_gateway_integration.plaid_integration.id,
+      aws_api_gateway_method.plaid_options.id,
+      aws_api_gateway_integration.plaid_options_integration.id,
+      aws_api_gateway_integration_response.plaid_options_integration_response.id,
+      aws_api_gateway_resource.plaid_webhook.id,
+      aws_api_gateway_method.plaid_webhook_method.id,
+      aws_api_gateway_integration.plaid_webhook_integration.id,
     ]))
   }
 
@@ -345,10 +381,11 @@ resource "aws_lambda_function" "transactions" {
 
   environment {
     variables = {
-      DB_USERNAME    = local.db_creds.username
-      DB_PASSWORD    = local.db_creds.password
-      DB_HOST        = var.db_host
-      ALLOWED_ORIGIN = var.frontend_origin
+      DB_USERNAME           = local.db_creds.username
+      DB_PASSWORD           = local.db_creds.password
+      DB_HOST               = var.db_host
+      ALLOWED_ORIGIN        = var.frontend_origin
+      TRANSACTION_QUEUE_URL = var.transaction_events_queue_url
     }
   }
 }
@@ -403,6 +440,196 @@ resource "aws_api_gateway_integration_response" "transactions_options_integratio
     "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'${var.frontend_origin}'"
   }
+}
+
+#plaid (link-token/exchange, Cognito-authed; own role since it doesn't need
+# RDS/VPC — see infra/modules/plaid/main.tf for why the Plaid-API-calling
+# and RDS-writing pieces are split across non-VPC/VPC Lambdas)
+
+resource "aws_iam_role" "plaid_link" {
+  name = "${var.environment}-financeapp-plaid-link-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "plaid_link_basic_logs" {
+  role       = aws_iam_role.plaid_link.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "plaid_link_secrets" {
+  name = "${var.environment}-financeapp-plaid-link-secrets"
+  role = aws_iam_role.plaid_link.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "secretsmanager:GetSecretValue"
+        Resource = var.plaid_credentials_secret_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = "secretsmanager:CreateSecret"
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "plaid_link_sqs_send" {
+  name = "${var.environment}-financeapp-plaid-link-sqs-send"
+  role = aws_iam_role.plaid_link.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "sqs:SendMessage"
+      Resource = var.plaid_events_queue_arn
+    }]
+  })
+}
+
+resource "aws_api_gateway_resource" "plaid" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  parent_id   = aws_api_gateway_rest_api.api_gateway.root_resource_id
+  path_part   = "plaid"
+}
+
+resource "aws_api_gateway_resource" "plaid_proxy" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  parent_id   = aws_api_gateway_resource.plaid.id
+  path_part   = "{proxy+}"
+}
+
+resource "aws_api_gateway_method" "plaid_method" {
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  resource_id   = aws_api_gateway_resource.plaid_proxy.id
+  http_method   = "ANY"
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
+}
+
+resource "aws_api_gateway_integration" "plaid_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.api_gateway.id
+  resource_id             = aws_api_gateway_resource.plaid_proxy.id
+  http_method             = aws_api_gateway_method.plaid_method.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.plaid_link.invoke_arn
+}
+
+resource "aws_lambda_function" "plaid_link" {
+  function_name = "${var.environment}-financeapp-plaid-link-lambda"
+  role          = aws_iam_role.plaid_link.arn
+  handler       = "handler.handler"
+  runtime       = "nodejs22.x"
+  timeout       = 15
+
+  filename         = "${path.module}/../../../backend/dist/plaid-link.zip"
+  source_code_hash = filebase64sha256("${path.module}/../../../backend/dist/plaid-link.zip")
+
+  environment {
+    variables = {
+      ALLOWED_ORIGIN               = var.frontend_origin
+      PLAID_CREDENTIALS_SECRET_ARN = var.plaid_credentials_secret_arn
+      PLAID_ITEM_SECRET_PREFIX     = "${var.environment}-financeapp-plaid-item-"
+      PLAID_EVENTS_QUEUE_URL       = var.plaid_events_queue_url
+      PLAID_WEBHOOK_URL            = "${local.api_base_url}/plaid-webhook"
+    }
+  }
+}
+
+resource "aws_lambda_permission" "allow_apigw_plaid" {
+  statement_id  = "AllowAPIGatewayInvokePlaidLink"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.plaid_link.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.api_gateway.execution_arn}/*/*"
+}
+
+resource "aws_api_gateway_method" "plaid_options" {
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  resource_id   = aws_api_gateway_resource.plaid_proxy.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method_response" "plaid_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.plaid_proxy.id
+  http_method = aws_api_gateway_method.plaid_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration" "plaid_options_integration" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.plaid_proxy.id
+  http_method = aws_api_gateway_method.plaid_options.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "plaid_options_integration_response" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  resource_id = aws_api_gateway_resource.plaid_proxy.id
+  http_method = aws_api_gateway_method.plaid_options.http_method
+  status_code = aws_api_gateway_method_response.plaid_options_200.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'${var.frontend_origin}'"
+  }
+}
+
+#plaid-webhook (public — Plaid calls this server-to-server, no Cognito token)
+
+resource "aws_api_gateway_resource" "plaid_webhook" {
+  rest_api_id = aws_api_gateway_rest_api.api_gateway.id
+  parent_id   = aws_api_gateway_rest_api.api_gateway.root_resource_id
+  path_part   = "plaid-webhook"
+}
+
+resource "aws_api_gateway_method" "plaid_webhook_method" {
+  rest_api_id   = aws_api_gateway_rest_api.api_gateway.id
+  resource_id   = aws_api_gateway_resource.plaid_webhook.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "plaid_webhook_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.api_gateway.id
+  resource_id             = aws_api_gateway_resource.plaid_webhook.id
+  http_method             = aws_api_gateway_method.plaid_webhook_method.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.plaid_webhook_invoke_arn
+}
+
+resource "aws_lambda_permission" "allow_apigw_plaid_webhook" {
+  statement_id  = "AllowAPIGatewayInvokePlaidWebhook"
+  action        = "lambda:InvokeFunction"
+  function_name = var.plaid_webhook_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.api_gateway.execution_arn}/*/*"
 }
 
 #Authorizer

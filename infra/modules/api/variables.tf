@@ -33,3 +33,38 @@ variable "frontend_origin" {
   type        = string
   default     = "*"
 }
+
+variable "transaction_events_queue_url" {
+  description = "URL of the async module's transaction-events queue, for the transactions Lambda to enqueue writes onto"
+  type        = string
+}
+
+variable "transaction_events_queue_arn" {
+  description = "ARN of the async module's transaction-events queue, scoped for the transactions Lambda's sqs:SendMessage permission"
+  type        = string
+}
+
+variable "plaid_credentials_secret_arn" {
+  description = "Secrets Manager ARN holding the Plaid client_id/secret, for plaid-link to call Plaid's API"
+  type        = string
+}
+
+variable "plaid_events_queue_url" {
+  description = "URL of the plaid module's plaid-events queue, for plaid-link to enqueue item_created messages"
+  type        = string
+}
+
+variable "plaid_events_queue_arn" {
+  description = "ARN of the plaid module's plaid-events queue"
+  type        = string
+}
+
+variable "plaid_webhook_invoke_arn" {
+  description = "Invoke ARN of the plaid module's plaid-webhook Lambda"
+  type        = string
+}
+
+variable "plaid_webhook_function_name" {
+  description = "Function name of the plaid module's plaid-webhook Lambda"
+  type        = string
+}

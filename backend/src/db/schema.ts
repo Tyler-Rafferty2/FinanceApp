@@ -22,12 +22,26 @@ export const categories = pgTable("categories", {
 
 export const accountType = pgEnum("account_type", ["checking", "savings", "credit_card", "cash", "investment"]);
 
+// Access token and sync cursor live in Secrets Manager (one secret per item,
+// named deterministically from plaidItemId), not here — that keeps them
+// reachable from Lambdas with no VPC/RDS access (plaid-link, plaid-webhook),
+// which is the whole point of the no-NAT-Gateway split for this phase.
+export const plaidItems = pgTable("plaid_items", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    plaidItemId: text("plaid_item_id").notNull().unique(),
+    institutionName: text("institution_name"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const accounts = pgTable("accounts", {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").notNull().references(() => users.id),
     type: accountType("type").notNull(),
     institution: text("institution"),
     name: text("name").notNull(),
+    plaidItemId: uuid("plaid_item_id").references(() => plaidItems.id),
+    plaidAccountId: text("plaid_account_id").unique(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -42,6 +56,7 @@ export const transactions = pgTable("transactions", {
     description: text("description"),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
     source: source("source").notNull().default("manual"),
+    plaidTransactionId: text("plaid_transaction_id").unique(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

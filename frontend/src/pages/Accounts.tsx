@@ -1,8 +1,49 @@
 import { useEffect, useState } from 'react'
+import { usePlaidLink } from 'react-plaid-link'
 import { api } from '../lib/api'
 import type { Account, AccountType, Transaction } from '../lib/types'
 
 const ACCOUNT_TYPES: AccountType[] = ['checking', 'savings', 'credit_card', 'cash', 'investment']
+
+function ConnectBankButton({ onLinked }: { onLinked: () => void }) {
+    const [linkToken, setLinkToken] = useState<string | null>(null)
+    const [linking, setLinking] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+
+    useEffect(() => {
+        api.post<{ linkToken: string }>('/plaid/link-token', {})
+            .then((res) => setLinkToken(res.linkToken))
+            .catch((err) => setError(err instanceof Error ? err.message : 'Failed to start Plaid Link'))
+    }, [])
+
+    const { open, ready } = usePlaidLink({
+        token: linkToken,
+        onSuccess: async (publicToken, metadata) => {
+            setLinking(true)
+            setError(null)
+            try {
+                await api.post('/plaid/exchange', {
+                    publicToken,
+                    institutionName: metadata.institution?.name,
+                })
+                onLinked()
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'Failed to link account')
+            } finally {
+                setLinking(false)
+            }
+        },
+    })
+
+    return (
+        <div>
+            <button onClick={() => open()} disabled={!ready || linking}>
+                {linking ? 'Linking…' : 'Connect a bank (Sandbox)'}
+            </button>
+            {error && <p className="error">{error}</p>}
+        </div>
+    )
+}
 
 function computeBalances(transactions: Transaction[]): Record<string, number> {
     const balances: Record<string, number> = {}
@@ -88,6 +129,8 @@ export function Accounts() {
         <div>
             <h1>Accounts</h1>
             {error && <p className="error">{error}</p>}
+
+            <ConnectBankButton onLinked={load} />
 
             <form onSubmit={handleCreate} className="inline-form">
                 <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />

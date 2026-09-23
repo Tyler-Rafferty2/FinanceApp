@@ -7,6 +7,7 @@ import { cors } from 'hono/cors'
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, and } from "drizzle-orm";
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 
 import { users, accounts, categories, transactions } from "../../db/schema.js";
 import { HTTPException } from "hono/http-exception";
@@ -47,6 +48,21 @@ function connect_db(): typeof db {
 }
 
 const db = connect_db()
+const sqs = new SQSClient({})
+
+// Enqueues, but never fails the request if the enqueue itself fails — this
+// queue has no consumer yet (laid groundwork for one), so losing a message
+// here shouldn't turn a successful DB write into a failed API response.
+async function enqueueTransactionEvent(operation: "create" | "update" | "delete", userId: string, transactionId: string) {
+    try {
+        await sqs.send(new SendMessageCommand({
+            QueueUrl: process.env.TRANSACTION_QUEUE_URL!,
+            MessageBody: JSON.stringify({ type: "transaction", operation, userId, transactionId }),
+        }))
+    } catch (err) {
+        console.error("failed to enqueue transaction event", err)
+    }
+}
 
 async function resolveUser(c: Context<{ Bindings: Bindings }>) {
     const event = c.env.event as unknown as APIGatewayProxyEvent
@@ -109,6 +125,8 @@ app.post('/create', zValidator('json', createTransactionSchema), async (c) => {
 
     const [transaction] = await db.insert(transactions).values(values).returning()
 
+    await enqueueTransactionEvent("create", user.id, transaction.id)
+
     return c.json(transaction, 201)
 })
 
@@ -137,6 +155,8 @@ app.put('/:id', zValidator('json', updateTransactionSchema), async (c) => {
 
     if (!transaction) throw new HTTPException(404, { message: "Transaction not found" })
 
+    await enqueueTransactionEvent("update", user.id, transaction.id)
+
     return c.json(transaction)
 })
 
@@ -151,6 +171,8 @@ app.delete('/:id', async (c) => {
         .returning()
 
     if (!transaction) throw new HTTPException(404, { message: "Transaction not found" })
+
+    await enqueueTransactionEvent("delete", user.id, transaction.id)
 
     return c.json({ deleted: true })
 })

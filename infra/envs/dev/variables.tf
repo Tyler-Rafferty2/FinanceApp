@@ -33,3 +33,26 @@ variable "frontend_origin" {
   type        = string
   default     = "*"
 }
+
+variable "ses_sender_email" {
+  description = "Verified SES sender identity the notifications Lambda sends weekly digest emails from. Must be verified in the SES console/CLI before apply."
+  type        = string
+}
+
+variable "plaid_client_id" {
+  description = "Plaid client_id (from the Plaid dashboard)"
+  type        = string
+  sensitive   = true
+}
+
+variable "plaid_secret" {
+  description = "Plaid Sandbox secret (from the Plaid dashboard)"
+  type        = string
+  sensitive   = true
+}
+
+variable "plaid_env" {
+  description = "Plaid API environment"
+  type        = string
+  default     = "sandbox"
+}

@@ -15,6 +15,13 @@
       "when": 1789168106165,
       "tag": "0001_wealthy_killraven",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790009086005,
+      "tag": "0002_lying_shocker",
+      "breakpoints": true
     }
   ]
 }
